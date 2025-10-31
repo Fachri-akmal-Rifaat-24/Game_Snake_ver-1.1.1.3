@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game ular 🐍</title>
+    <!-- Menghubungkan file CSS agar tampilan game lebih rapi -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+   <!-- Judul game -->
+   <h1>Game Ular 🐍</h1>
+
+   <!-- Canvas adalah tempat permainan digambar -->
+   <!-- Ukuran: lebar 1000 piksel, tinggi 500 piksel -->
+   <canvas id="gamecanvas" width="1000" height="500"></canvas> 
+
+   <!-- Bagian informasi seperti skor dan tombol -->
+   <div class="info">
+       <!-- Menampilkan skor pemain -->
+       <!-- Angka skor ditampilkan di dalam elemen <span> -->
+       <p>Skor: <span id="score">0</span></p>
+
+       <!-- Tulisan “Game Over” akan muncul saat ular mati -->
+       <!-- Awalnya disembunyikan dengan display: none -->
+       <p id="gameover" style="display: none; color: red;">Game Over!</p>
+
+       <!-- Tombol untuk memulai ulang permainan -->
+       <button onclick="restartGame()">RESTART</button>
+   </div>
+
+   <!-- Menghubungkan file JavaScript berisi logika game -->
+   <script src="script.js"></script>
+</body>
+</html>

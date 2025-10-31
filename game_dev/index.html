@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Game Ular - Gaya HP Nokia</title>
+  <style>
+    :root{
+      --bg:#0b2b05; /* dark green */
+      --grid:#153d17; /* slightly lighter */
+      --snake:#a3ff7a; /* bright green */
+      --food:#ffdf4d; /* yellowish */
+      --text:#bfe9a0;
+      --glass: rgba(255,255,255,0.03);
+      --font: 'Courier New', monospace;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:var(--font);background:linear-gradient(180deg,var(--bg),#06220a);color:var(--text);display:flex;align-items:center;justify-content:center}
+    .wrap{width:360px;max-width:96vw;padding:16px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(0,0,0,0.12));box-shadow:0 8px 30px rgba(0,0,0,0.6)}
+    header{text-align:center;margin-bottom:10px}
+    h1{margin:0;font-size:18px}
+    .screen{background:var(--grid);border-radius:8px;padding:12px;display:flex;gap:12px}
+    .game-area{background:var(--bg);padding:8px;border-radius:6px;display:flex;flex-direction:column;align-items:center}
+    canvas{background:repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 34px), repeating-linear-gradient(90deg, rgba(255,255,255,0.01) 0 1px, transparent 1px 34px);image-rendering:pixelated;border:4px solid rgba(0,0,0,0.4);border-radius:6px}
+    .hud{display:flex;gap:8px;align-items:center;margin-top:8px}
+    .panel{background:var(--glass);padding:6px 8px;border-radius:6px;font-size:13px}
+    .controls{display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center}
+    .btn{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);padding:6px 8px;border-radius:6px;cursor:pointer}
+    .btn:active{transform:translateY(1px)}
+    .dpad{width:120px;height:120px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:10px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:6px;padding:6px}
+    .dpad button{background:transparent;border:1px solid rgba(255,255,255,0.04);border-radius:6px;font-size:18px;padding:6px;cursor:pointer}
+    .dpad button.center{background:rgba(0,0,0,0.2);border-style:solid;cursor:default}
+    footer{margin-top:10px;text-align:center;font-size:12px;color:rgba(191,233,160,0.8)}
+    @media (max-width:420px){.wrap{width:320px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🐍 Game Ular — Gaya HP Nokia</h1>
+      <div style="font-size:12px;color:var(--text);opacity:0.9">Gunakan panah / WASD atau tombol di layar</div>
+    </header>
+
+    <div class="screen">
+      <div class="game-area">
+        <canvas id="board" width="320" height="320"></canvas>
+        <div class="hud">
+          <div class="panel">Skor: <span id="score">0</span></div>
+          <div class="panel">Rekor: <span id="best">0</span></div>
+          <div class="panel">Level: <span id="level">1</span></div>
+          <button class="btn" id="startBtn">Mulai / Mulai Ulang</button>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div style="display:flex;gap:8px">
+          <label style="font-size:12px">Mode Tabrak Tembok</label>
+          <input type="checkbox" id="wallMode" title="Kalau dicek maka menabrak tembok GAME OVER" checked>
+        </div>
+
+        <div class="dpad" id="dpad">
+          <button data-dir="" class="corner" aria-hidden></button>
+          <button data-dir="up">▲</button>
+          <button data-dir="" class="corner" aria-hidden></button>
+
+          <button data-dir="left">◀</button>
+          <button class="center">OK</button>
+          <button data-dir="right">▶</button>
+
+          <button data-dir="" class="corner" aria-hidden></button>
+          <button data-dir="down">▼</button>
+          <button data-dir="" class="corner" aria-hidden></button>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn" id="pauseBtn">Jeda</button>
+          <button class="btn" id="soundBtn">Suara: On</button>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      Gaya retro, grid pixel seperti Nokia. Dibuat dengan HTML/CSS/JS — buka file ini di browser untuk main.
+    </footer>
+  </div>
+
+  <script>
+  // ======= Konfigurasi =======
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const gridSize = 16; // pixel block size
+  const cols = canvas.width / gridSize; // 320/16 = 20
+  const rows = canvas.height / gridSize;
+
+  // Game state
+  let snake;
+  let dir;
+  let nextDir;
+  let food;
+  let score = 0;
+  let best = Number(localStorage.getItem('nokia_snake_best') || 0);
+  let intervalId = null;
+  let speed = 200; // ms
+  let level = 1;
+  let paused = false;
+  let wallMode = true; // if true, hitting wall = game over
+  let soundOn = true;
+
+  // DOM
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const levelEl = document.getElementById('level');
+  const startBtn = document.getElementById('startBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const wallModeEl = document.getElementById('wallMode');
+  const soundBtn = document.getElementById('soundBtn');
+
+  bestEl.textContent = best;
+
+  // ======= Util =======
+  function randInt(min,max){return Math.floor(Math.random()*(max-min+1))+min}
+
+  function playBeep(f=440, t=0.06){
+    if(!soundOn) return;
+    try{
+      const A = new (window.AudioContext||window.webkitAudioContext)();
+      const o = A.createOscillator();
+      const g = A.createGain();
+      o.type='square'; o.frequency.value=f; g.gain.value=0.05;
+      o.connect(g); g.connect(A.destination);
+      o.start(); g.gain.exponentialRampToValueAtTime(0.0001, A.currentTime + t);
+      setTimeout(()=>{o.stop(); A.close()}, t*1000 + 20);
+    }catch(e){/* audio may be blocked */}
+  }
+
+  // ======= Game logic =======
+  function resetGame(){
+    snake = [{x:9,y:10},{x:8,y:10},{x:7,y:10}];
+    dir = {x:1,y:0};
+    nextDir = dir;
+    placeFood();
+    score = 0; level = 1; speed = 200; paused = false;
+    scoreEl.textContent = score; levelEl.textContent = level; bestEl.textContent = best;
+    startLoop();
+  }
+
+  function placeFood(){
+    while(true){
+      const x = randInt(0,cols-1); const y = randInt(0,rows-1);
+      if(!snake.some(s=>s.x===x && s.y===y)){
+        food = {x,y}; return;
+      }
+    }
+  }
+
+  function step(){
+    if(paused) return;
+    dir = nextDir;
+    const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+
+    // wall collision
+    if(wallMode){
+      if(head.x < 0 || head.x >= cols || head.y < 0 || head.y >= rows){
+        return gameOver();
+      }
+    } else {
+      // wrap around
+      if(head.x < 0) head.x = cols -1;
+      if(head.x >= cols) head.x = 0;
+      if(head.y < 0) head.y = rows -1;
+      if(head.y >= rows) head.y = 0;
+    }
+
+    // self collision
+    if(snake.some(s=>s.x===head.x && s.y===head.y)) return gameOver();
+
+    snake.unshift(head);
+
+    // eat food
+    if(head.x === food.x && head.y === food.y){
+      score += 100;
+      playBeep(880,0.06);
+      placeFood();
+      // speed up every 30 points
+      if(score % 30 === 0){
+        level++; speed = Math.max(60, speed - 20);
+        levelEl.textContent = level;
+        restartLoop();
+      }
+      scoreEl.textContent = score;
+      if(score > best){ best = score; localStorage.setItem('nokia_snake_best', best); bestEl.textContent = best; }
+    } else {
+      snake.pop();
+    }
+
+    draw();
+  }
+
+  function gameOver(){
+    playBeep(120,0.25);
+    paused = true;
+    clearInterval(intervalId); intervalId = null;
+    setTimeout(()=>{
+      if(confirm('Game Over. Mulai lagi?')) resetGame();
+    },50);
+  }
+
+  function startLoop(){
+    if(intervalId) clearInterval(intervalId);
+    intervalId = setInterval(step, speed);
+  }
+  function restartLoop(){
+    if(intervalId) clearInterval(intervalId);
+    intervalId = setInterval(step, speed);
+  }
+
+  // ======= Rendering =======
+  function draw(){
+    // clear
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim() || '#153d17';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // draw food
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--food').trim() || '#ffdf4d';
+    ctx.fillRect(food.x*gridSize, food.y*gridSize, gridSize, gridSize);
+
+    // draw snake with gradient head
+    for(let i=0;i<snake.length;i++){
+      const s = snake[i];
+      if(i===0){
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--snake').trim() || '#a3ff7a';
+        // draw a slightly brighter head
+        ctx.fillRect(s.x*gridSize, s.y*gridSize, gridSize, gridSize);
+        // eyes for retro look
+        ctx.fillStyle = '#063';
+        const eyeSize = Math.max(2, Math.floor(gridSize/4));
+        ctx.fillRect(s.x*gridSize + 3, s.y*gridSize + 3, eyeSize, eyeSize);
+        ctx.fillRect(s.x*gridSize + gridSize - 6, s.y*gridSize + 3, eyeSize, eyeSize);
+      } else {
+        // body darker with slight check pattern
+        ctx.fillStyle = i%2===0? '#7fbf56':'#95d872';
+        ctx.fillRect(s.x*gridSize, s.y*gridSize, gridSize, gridSize);
+      }
+    }
+  }
+
+  // ======= Input =======
+  window.addEventListener('keydown', e=>{
+    const key = e.key.toLowerCase();
+    if(key==='arrowup' || key==='w'){ setDir(0,-1);} else if(key==='arrowdown'||key==='s'){ setDir(0,1);} else if(key==='arrowleft'||key==='a'){ setDir(-1,0);} else if(key==='arrowright'||key==='d'){ setDir(1,0);} else if(key===' '){ paused = !paused; }
+  });
+
+  function setDir(x,y){
+    // prevent reversing
+    if(dir && x === -dir.x && y === -dir.y) return;
+    nextDir = {x,y};
+  }
+
+  // dpad touch
+  document.getElementById('dpad').addEventListener('click', e=>{
+    const d = e.target.getAttribute('data-dir');
+    if(!d) return;
+    if(d==='up') setDir(0,-1);
+    if(d==='down') setDir(0,1);
+    if(d==='left') setDir(-1,0);
+    if(d==='right') setDir(1,0);
+  });
+
+  // buttons
+  startBtn.addEventListener('click', ()=>{ resetGame(); });
+  pauseBtn.addEventListener('click', ()=>{ paused = !paused; pauseBtn.textContent = paused? 'Lanjut' : 'Jeda'; if(!paused && !intervalId) startLoop(); });
+  wallModeEl.addEventListener('change', ()=>{ wallMode = wallModeEl.checked; });
+  soundBtn.addEventListener('click', ()=>{ soundOn = !soundOn; soundBtn.textContent = 'Suara: ' + (soundOn? 'On':'Off'); });
+
+  // init
+  resetGame();
+  draw();
+
+  // touch swipe support (simple)
+  let touchStart = null;
+  canvas.addEventListener('touchstart', e=>{ const t = e.touches[0]; touchStart = {x:t.clientX,y:t.clientY}; });
+  canvas.addEventListener('touchend', e=>{
+    if(!touchStart) return; const t = e.changedTouches[0]; const dx = t.clientX - touchStart.x; const dy = t.clientY - touchStart.y;
+    if(Math.abs(dx) > Math.abs(dy)){
+      if(dx > 20) setDir(1,0); else if(dx < -20) setDir(-1,0);
+    } else {
+      if(dy > 20) setDir(0,1); else if(dy < -20) setDir(0,-1);
+    }
+    touchStart = null;
+  });
+
+  // make canvas crisp on high dpi
+  (function adjustDPI(){
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = 320 * dpr; canvas.height = 320 * dpr;
+    canvas.style.width = '320px'; canvas.style.height = '320px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  })();
+
+  </script>
+</body>
+</html>
